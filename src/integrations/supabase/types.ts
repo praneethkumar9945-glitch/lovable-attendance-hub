@@ -14,7 +14,74 @@ export type Database = {
   }
   public: {
     Tables: {
-      [_ in never]: never
+      attendance: {
+        Row: {
+          employee_id: string
+          hr_id: string
+          id: string
+          punch_type: string
+          punched_at: string
+        }
+        Insert: {
+          employee_id: string
+          hr_id: string
+          id?: string
+          punch_type: string
+          punched_at?: string
+        }
+        Update: {
+          employee_id?: string
+          hr_id?: string
+          id?: string
+          punch_type?: string
+          punched_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "attendance_employee_id_fkey"
+            columns: ["employee_id"]
+            isOneToOne: false
+            referencedRelation: "employees"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      employees: {
+        Row: {
+          created_at: string
+          department: string | null
+          email: string | null
+          employee_code: string
+          full_name: string
+          hr_id: string
+          id: string
+          phone: string | null
+          position: string | null
+        }
+        Insert: {
+          created_at?: string
+          department?: string | null
+          email?: string | null
+          employee_code: string
+          full_name: string
+          hr_id: string
+          id?: string
+          phone?: string | null
+          position?: string | null
+        }
+        Update: {
+          created_at?: string
+          department?: string | null
+          email?: string | null
+          employee_code?: string
+          full_name?: string
+          hr_id?: string
+          id?: string
+          phone?: string | null
+          position?: string | null
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
