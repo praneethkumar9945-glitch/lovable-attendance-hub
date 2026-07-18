@@ -3,6 +3,8 @@ import { Html5Qrcode } from "html5-qrcode";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Label } from "@/components/ui/label";
 import { toast } from "sonner";
 import { Camera, StopCircle, LogIn, LogOut } from "lucide-react";
 
@@ -14,9 +16,19 @@ export default function AttendanceScanner() {
   const [scanning, setScanning] = useState(false);
   const [lastEmp, setLastEmp] = useState<Employee | null>(null);
   const [processing, setProcessing] = useState(false);
+  const [employees, setEmployees] = useState<Employee[]>([]);
+  const [selectedId, setSelectedId] = useState<string>("");
   const cooldownRef = useRef<string | null>(null);
 
-  useEffect(() => () => { stop(); }, []);
+  useEffect(() => {
+    loadEmployees();
+    return () => { stop(); };
+  }, []);
+
+  async function loadEmployees() {
+    const { data } = await supabase.from("employees").select("id,full_name,employee_code").order("full_name");
+    if (data) setEmployees(data);
+  }
 
   async function start() {
     try {
@@ -60,37 +72,38 @@ export default function AttendanceScanner() {
     } catch {}
   }
 
+  async function punch(emp: Employee, punch_type: "in" | "out") {
+    const { data: userData } = await supabase.auth.getUser();
+    const hr_id = userData.user!.id;
+    const { error } = await supabase.from("attendance").insert({ employee_id: emp.id, hr_id, punch_type });
+    if (error) { toast.error(error.message); return false; }
+    const msg = `${punch_type === "in" ? "Punch in" : "Punch out"} confirmed for ${emp.full_name}`;
+    toast.success(msg);
+    speak(msg);
+    setLastEmp(emp);
+    return true;
+  }
+
   async function handleScan(employeeId: string) {
     setProcessing(true);
     const { data: emp, error } = await supabase.from("employees").select("id,full_name,employee_code").eq("id", employeeId).maybeSingle();
     if (error || !emp) { toast.error("Unknown QR code"); speak("Invalid QR code"); setProcessing(false); return; }
-    // Determine punch type by last record today
     const startOfDay = new Date(); startOfDay.setHours(0,0,0,0);
     const { data: last } = await supabase.from("attendance")
       .select("punch_type").eq("employee_id", emp.id)
       .gte("punched_at", startOfDay.toISOString())
       .order("punched_at", { ascending: false }).limit(1).maybeSingle();
     const punch_type: "in" | "out" = last?.punch_type === "in" ? "out" : "in";
-    const { data: userData } = await supabase.auth.getUser();
-    const hr_id = userData.user!.id;
-    const { error: insErr } = await supabase.from("attendance").insert({ employee_id: emp.id, hr_id, punch_type });
-    if (insErr) { toast.error(insErr.message); setProcessing(false); return; }
-    setLastEmp(emp);
-    const msg = `${punch_type === "in" ? "Punch in" : "Punch out"} confirmed for ${emp.full_name}`;
-    toast.success(msg);
-    speak(msg);
+    await punch(emp, punch_type);
     setProcessing(false);
   }
 
   async function manualPunch(type: "in" | "out") {
-    if (!lastEmp) return;
-    const { data: userData } = await supabase.auth.getUser();
-    const hr_id = userData.user!.id;
-    const { error } = await supabase.from("attendance").insert({ employee_id: lastEmp.id, hr_id, punch_type: type });
-    if (error) return toast.error(error.message);
-    const msg = `${type === "in" ? "Punch in" : "Punch out"} confirmed for ${lastEmp.full_name}`;
-    toast.success(msg);
-    speak(msg);
+    const emp = employees.find((e) => e.id === selectedId) ?? lastEmp;
+    if (!emp) { toast.error("Select an employee first"); return; }
+    setProcessing(true);
+    await punch(emp, type);
+    setProcessing(false);
   }
 
   return (
@@ -109,16 +122,37 @@ export default function AttendanceScanner() {
         </CardContent>
       </Card>
 
+      <Card>
+        <CardContent className="space-y-3 p-4">
+          <div className="space-y-1.5">
+            <Label className="text-xs uppercase text-muted-foreground">Manual punch</Label>
+            <Select value={selectedId} onValueChange={setSelectedId}>
+              <SelectTrigger><SelectValue placeholder="Select employee" /></SelectTrigger>
+              <SelectContent>
+                {employees.map((e) => (
+                  <SelectItem key={e.id} value={e.id}>{e.full_name} ({e.employee_code})</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+          <div className="grid grid-cols-2 gap-2">
+            <Button onClick={() => manualPunch("in")} disabled={processing} className="bg-emerald-600 hover:bg-emerald-700">
+              <LogIn className="mr-2 h-4 w-4" />Punch In
+            </Button>
+            <Button onClick={() => manualPunch("out")} disabled={processing} variant="destructive">
+              <LogOut className="mr-2 h-4 w-4" />Punch Out
+            </Button>
+          </div>
+          <p className="text-center text-xs text-muted-foreground">Both Punch In and Punch Out can be recorded for the same employee on the same day.</p>
+        </CardContent>
+      </Card>
+
       {lastEmp && (
         <Card>
           <CardContent className="p-4">
             <p className="text-xs uppercase text-muted-foreground">Last scanned</p>
             <p className="text-lg font-semibold">{lastEmp.full_name}</p>
             <p className="text-xs text-muted-foreground">Code: <span className="font-mono">{lastEmp.employee_code}</span></p>
-            <div className="mt-3 grid grid-cols-2 gap-2">
-              <Button variant="outline" onClick={() => manualPunch("in")} disabled={processing}><LogIn className="mr-2 h-4 w-4" />Punch in</Button>
-              <Button variant="outline" onClick={() => manualPunch("out")} disabled={processing}><LogOut className="mr-2 h-4 w-4" />Punch out</Button>
-            </div>
           </CardContent>
         </Card>
       )}
