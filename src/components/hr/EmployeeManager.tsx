@@ -126,34 +126,44 @@ export default function EmployeeManager() {
 }
 
 function QRDialog({ employee, onClose }: { employee: Employee | null; onClose: () => void }) {
-  const canvasRef = useRef<HTMLCanvasElement>(null);
+  const [dataUrl, setDataUrl] = useState<string>("");
+
   useEffect(() => {
-    if (employee && canvasRef.current) {
-      QRCode.toCanvas(canvasRef.current, employee.id, { width: 280, margin: 2 }, (err) => {
-        if (err) console.error(err);
-      });
+    let cancelled = false;
+    if (employee) {
+      QRCode.toDataURL(employee.id, { width: 280, margin: 2, errorCorrectionLevel: "M" })
+        .then((url) => { if (!cancelled) setDataUrl(url); })
+        .catch((err) => { console.error("QR generation failed", err); toast.error("Failed to generate QR"); });
+    } else {
+      setDataUrl("");
     }
+    return () => { cancelled = true; };
   }, [employee]);
 
   function download() {
-    if (!canvasRef.current || !employee) return;
-    const url = canvasRef.current.toDataURL("image/png");
+    if (!dataUrl || !employee) return;
     const a = document.createElement("a");
-    a.href = url;
+    a.href = dataUrl;
     a.download = `${employee.employee_code}-${employee.full_name}.png`;
     a.click();
   }
 
   return (
     <Dialog open={!!employee} onOpenChange={(o) => !o && onClose()}>
-      <DialogContent className="max-w-sm">
+      <DialogContent className="max-w-sm" aria-describedby={undefined}>
         <DialogHeader>
           <DialogTitle>{employee?.full_name}</DialogTitle>
         </DialogHeader>
         <div className="flex flex-col items-center gap-3">
-          <div className="rounded-lg border bg-white p-3"><canvas ref={canvasRef} /></div>
+          <div className="rounded-lg border bg-white p-3 min-h-[280px] min-w-[280px] flex items-center justify-center">
+            {dataUrl ? (
+              <img src={dataUrl} alt="Employee QR code" width={280} height={280} />
+            ) : (
+              <span className="text-xs text-muted-foreground">Generating…</span>
+            )}
+          </div>
           <p className="text-center text-xs text-muted-foreground">Code: <span className="font-mono">{employee?.employee_code}</span></p>
-          <Button onClick={download} className="w-full"><Download className="mr-2 h-4 w-4" />Download QR</Button>
+          <Button onClick={download} disabled={!dataUrl} className="w-full"><Download className="mr-2 h-4 w-4" />Download QR</Button>
         </div>
       </DialogContent>
     </Dialog>
