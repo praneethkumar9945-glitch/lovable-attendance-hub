@@ -21,6 +21,7 @@ export type Database = {
           id: string
           punch_type: string
           punched_at: string
+          snapshot_url: string | null
         }
         Insert: {
           employee_id: string
@@ -28,6 +29,7 @@ export type Database = {
           id?: string
           punch_type: string
           punched_at?: string
+          snapshot_url?: string | null
         }
         Update: {
           employee_id?: string
@@ -35,6 +37,7 @@ export type Database = {
           id?: string
           punch_type?: string
           punched_at?: string
+          snapshot_url?: string | null
         }
         Relationships: [
           {
@@ -56,7 +59,9 @@ export type Database = {
           hr_id: string
           id: string
           phone: string | null
+          photo_url: string | null
           position: string | null
+          user_id: string | null
         }
         Insert: {
           created_at?: string
@@ -67,7 +72,9 @@ export type Database = {
           hr_id: string
           id?: string
           phone?: string | null
+          photo_url?: string | null
           position?: string | null
+          user_id?: string | null
         }
         Update: {
           created_at?: string
@@ -78,7 +85,134 @@ export type Database = {
           hr_id?: string
           id?: string
           phone?: string | null
+          photo_url?: string | null
           position?: string | null
+          user_id?: string | null
+        }
+        Relationships: []
+      }
+      profiles: {
+        Row: {
+          created_at: string
+          department: string | null
+          email: string | null
+          full_name: string | null
+          id: string
+          photo_url: string | null
+        }
+        Insert: {
+          created_at?: string
+          department?: string | null
+          email?: string | null
+          full_name?: string | null
+          id: string
+          photo_url?: string | null
+        }
+        Update: {
+          created_at?: string
+          department?: string | null
+          email?: string | null
+          full_name?: string | null
+          id?: string
+          photo_url?: string | null
+        }
+        Relationships: []
+      }
+      student_attendance: {
+        Row: {
+          id: string
+          punch_type: string
+          punched_at: string
+          recorded_by: string | null
+          snapshot_url: string | null
+          student_id: string
+        }
+        Insert: {
+          id?: string
+          punch_type: string
+          punched_at?: string
+          recorded_by?: string | null
+          snapshot_url?: string | null
+          student_id: string
+        }
+        Update: {
+          id?: string
+          punch_type?: string
+          punched_at?: string
+          recorded_by?: string | null
+          snapshot_url?: string | null
+          student_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "student_attendance_student_id_fkey"
+            columns: ["student_id"]
+            isOneToOne: false
+            referencedRelation: "students"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      students: {
+        Row: {
+          class_name: string | null
+          created_at: string
+          department: string | null
+          email: string | null
+          full_name: string
+          hr_id: string
+          id: string
+          phone: string | null
+          photo_url: string | null
+          student_code: string
+          user_id: string | null
+        }
+        Insert: {
+          class_name?: string | null
+          created_at?: string
+          department?: string | null
+          email?: string | null
+          full_name: string
+          hr_id: string
+          id?: string
+          phone?: string | null
+          photo_url?: string | null
+          student_code: string
+          user_id?: string | null
+        }
+        Update: {
+          class_name?: string | null
+          created_at?: string
+          department?: string | null
+          email?: string | null
+          full_name?: string
+          hr_id?: string
+          id?: string
+          phone?: string | null
+          photo_url?: string | null
+          student_code?: string
+          user_id?: string | null
+        }
+        Relationships: []
+      }
+      user_roles: {
+        Row: {
+          created_at: string
+          id: string
+          role: Database["public"]["Enums"]["app_role"]
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          role: Database["public"]["Enums"]["app_role"]
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          role?: Database["public"]["Enums"]["app_role"]
+          user_id?: string
         }
         Relationships: []
       }
@@ -87,10 +221,25 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
-      [_ in never]: never
+      claim_role: {
+        Args: {
+          _department?: string
+          _full_name: string
+          _role: Database["public"]["Enums"]["app_role"]
+        }
+        Returns: string
+      }
+      has_role: {
+        Args: {
+          _role: Database["public"]["Enums"]["app_role"]
+          _user_id: string
+        }
+        Returns: boolean
+      }
+      my_department: { Args: never; Returns: string }
     }
     Enums: {
-      [_ in never]: never
+      app_role: "hr" | "incharge" | "employee" | "student"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -217,6 +366,8 @@ export type CompositeTypes<
 
 export const Constants = {
   public: {
-    Enums: {},
+    Enums: {
+      app_role: ["hr", "incharge", "employee", "student"],
+    },
   },
 } as const
